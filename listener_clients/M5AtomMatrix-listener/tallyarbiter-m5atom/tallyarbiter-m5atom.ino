@@ -11,6 +11,14 @@
 #include <ESPmDNS.h>
 #include <Preferences.h>
 #define DATA_PIN_LED 27
+#define DISPLAY_BRIGHTNESS 10
+
+// -- RGB LED --
+#define RGBLED_PIN 22
+#define RGBLED_BRIGHTNESS 150
+#include <FastLED.h>
+CRGB rgb_led[1];
+// --- --- ---
 
 //M5 variables
 PinButton btnAction(39); //the "Action" button on the device
@@ -352,8 +360,18 @@ void evaluateMode() {
       // If you want the camera number displayed during Pgm and Pvw, uncomment the following line and comment the line after.
       // drawNumber(number[camNumber], currColor);
       drawNumber(icons[12], currColor);
+      
+      // -- RGB LED --
+      rgb_led[0] = backgroundColor;
+      FastLED.show();
+      // --- --- ---
     } else {
       drawNumber(number[camNumber], offcolor);
+      
+      // -- RGB LED --
+      rgb_led[0] = GRB_COLOR_BLACK;
+      FastLED.show();
+      // --- --- ---
     }
 
     #if TALLY_EXTRA_OUTPUT
@@ -727,6 +745,45 @@ void saveParamCallback() {
 
 }
 
+
+// -- RGB LED --
+CRGB Scroll(int pos) {
+	CRGB color (0,0,0);
+	if(pos < 85) {
+		color.g = 0;
+		color.r = ((float)pos / 85.0f) * 255.0f;
+		color.b = 255 - color.r;
+	} else if(pos < 170) {
+		color.g = ((float)(pos - 85) / 85.0f) * 255.0f;
+		color.r = 255 - color.g;
+		color.b = 0;
+	} else if(pos < 256) {
+		color.b = ((float)(pos - 170) / 85.0f) * 255.0f;
+		color.g = 255 - color.b;
+		color.r = 1;
+	}
+	return color;
+}
+
+void Rainbow() {
+  for (int j = 0; j < 255; j += 2) {
+    rgb_led[0] = Scroll(j);
+    FastLED.show();
+    delay(2);
+  }
+  rgb_led[0] = GRB_COLOR_BLACK;
+  FastLED.show();
+}
+
+void ShowRGBLED( int color ) {
+  FastLED.setBrightness(RGBLED_BRIGHTNESS);
+  FastLED.show();
+  rgb_led[0] = color;
+  FastLED.show();
+  //FastLED.setBrightness(DISPLAY_BRIGHTNESS);
+  //FastLED.show();
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // Setup is the pre-loop running program
 
@@ -741,7 +798,12 @@ void setup() {
   uint64_t chipid = ESP.getEfuseMac();
   listenerDeviceName = "m5Atom-" + String((uint16_t)(chipid>>32)) + String((uint32_t)chipid);
   logger("Listener device name: " + listenerDeviceName, "info");
-
+  
+  // ------ RGB LED BEGIN -------
+  FastLED.addLeds<WS2812B, RGBLED_PIN, GRB>(rgb_led, 1);
+  Rainbow();
+  // ------ -------------- -------
+  
   M5.begin(true, false, true);
   delay(50);
   M5.dis.drawpix(0, 0xf00000);
@@ -853,8 +915,11 @@ void loop(){
     logger("Cam Number: " + String(camNumber), "info-quiet");
     logger("---------------------------------", "info-quiet");
     logger("", "info-quiet");
-  }
     
+    ShowRGBLED( GRB_COLOR_RED );
+  }
+  
+  
   if (M5.Btn.pressedFor(5000)){
     wm.resetSettings();
     ESP.restart();
@@ -870,6 +935,10 @@ void loop(){
       Serial.println("trying to re-connect with server");
       connectToServer();
       currentReconnectTime = millis();
+      
+      
+      rgb_led[0] = GRB_COLOR_BLACK;
+      FastLED.show();
     }
   }
   
